@@ -1,0 +1,10 @@
+Classification Report
+=====================
+              precision    recall  f1-score   support
+
+  Normal (0)       0.66      0.92      0.77       635
+Fracture (1)       0.78      0.37      0.50       484
+
+    accuracy                           0.68      1119
+   macro avg       0.72      0.65      0.64      1119
+weighted avg       0.71      0.68      0.65      1119
