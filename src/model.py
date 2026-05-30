@@ -4,6 +4,12 @@ from tensorflow.keras.layers import GlobalAveragePooling2D, Dropout, Dense
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
+import ssl
+import os
+
+# This bypasses the SSL certificate verification
+ssl._create_default_https_context = ssl._create_unverified_context
+
 def build_model(input_shape=(224, 224, 3), learning_rate=0.001):
     """
     Constructs the transfer learning model using a pre-trained DenseNet121 backbone,

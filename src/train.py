@@ -12,7 +12,7 @@ from model import build_model
 # --- Configuration ---
 BATCH_SIZE = 32
 EPOCHS = 30
-LEARNING_RATE = 0.001
+LEARNING_RATE = 1e-5
 BASE_DIR = '../' # Points to the root where MURA-v1.1 is located
 
 def setup_run_folder():

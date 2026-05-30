@@ -26,11 +26,12 @@ def setup_finetune_folder():
     return run_dir
 
 def get_latest_base_run():
-    """Specifically hunts for the latest base training run, ignoring finetune folders."""
-    runs_dir = os.path.join(BASE_DIR, 'runs')
-    # Filter for folders that strictly start with 'run_'
+    runs_dir = os.path.abspath(os.path.join(BASE_DIR, 'runs')) # Use Absolute Path
+    if not os.path.exists(runs_dir):
+        raise FileNotFoundError(f"Directory not found: {runs_dir}")
+        
     base_runs = [os.path.join(runs_dir, d) for d in os.listdir(runs_dir) 
-                 if os.path.isdir(os.path.join(runs_dir, d)) and os.path.basename(d).startswith('run_')]
+                 if os.path.basename(d).startswith('run_')]
     
     if not base_runs:
         raise FileNotFoundError("Could not find any base 'run_' directories.")
