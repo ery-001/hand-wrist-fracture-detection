@@ -44,27 +44,35 @@ def make_gradcam_heatmap(img_array, model, last_conv_layer_name="relu"):
     heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
     return heatmap.numpy()
 
-def display_gradcam(img_array, heatmap, alpha=0.4):
-    """Overlays the heatmap onto the original image."""
+def display_gradcam(img_array, heatmap, alpha=0.5):
+    """Overlays the heatmap onto the original image with thick, beautiful coloring."""
     # Convert original image from [0, 1] float to [0, 255] uint8
     img = np.uint8(255 * img_array[0])
     
-    # FIX: Resize the tiny 7x7 heatmap to match the 224x224 original image
+    # Resize the tiny heatmap to match the original image dimensions
     heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
+    
+    # NEW: Apply Gaussian blur to smooth out the blocky upscaling artifacts
+    # This creates thick, organic, smooth patches of color
+    heatmap = cv2.GaussianBlur(heatmap, (15, 15), 0)
+    
+    # NEW: Apply a slight power transformation to intensify the "hot" spots
+    # and suppress the low-confidence background noise
+    heatmap = np.power(heatmap, 1.5)
     
     # Rescale heatmap to a range 0-255
     heatmap = np.uint8(255 * heatmap)
 
-    # Use cv2 to generate a color map (JET creates the classic blue-to-red thermal look)
-    jet = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    # NEW: Use COLORMAP_TURBO (or COLORMAP_INFERNO) for highly vibrant, modern, deep colors
+    color_map = cv2.applyColorMap(heatmap, cv2.COLORMAP_TURBO)
     
-    # Keras loads images as RGB, cv2 uses BGR. Convert jet to RGB
-    jet = cv2.cvtColor(jet, cv2.COLOR_BGR2RGB)
+    # Keras loads images as RGB, cv2 uses BGR. Convert the colormap to RGB
+    color_map = cv2.cvtColor(color_map, cv2.COLOR_BGR2RGB)
 
-    # Superimpose the heatmap on original image
-    superimposed_img = jet * alpha + img
-    superimposed_img = tf.keras.utils.array_to_img(superimposed_img)
-    return superimposed_img
+    # NEW: Safely blend the images using cv2.addWeighted for a clean, saturated overlay
+    superimposed_img = cv2.addWeighted(color_map, alpha, img, 1 - alpha, 0)
+    
+    return tf.keras.utils.array_to_img(superimposed_img)
 
 def main():
     latest_run_dir = get_latest_run_dir()
