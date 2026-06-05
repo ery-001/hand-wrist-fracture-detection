@@ -10,7 +10,7 @@ from tensorflow.keras.applications.densenet import preprocess_input
 # =====================================================================
 # CUSTOM PREPROCESSING (CLAHE + IMAGENET NORMALIZATION)
 # =====================================================================
-def apply_clahe_and_preprocess(img):
+def apply_clahe(img):
     """
     Step 1: Applies Contrast Limited Adaptive Histogram Equalization (CLAHE)
             to aggressively highlight micro-fractures and bone structures.
@@ -89,14 +89,14 @@ def get_data_generators(base_dir='.', batch_size=32, target_size=(224, 224)):
         rotation_range=15,          # Mild rotation to simulate imperfect patient positioning
         horizontal_flip=True,       # Left/Right hand variations
         zoom_range=0.2,             # Simulate different camera distances
-        preprocessing_function=apply_clahe_and_preprocess, # Our custom logic
+        preprocessing_function=apply_clahe, # Our custom logic
         validation_split=0.176      # Extracts ~15% of total data for validation
     )
 
     # 2. Testing Generator Strategy
     # Zero augmentation allowed here. Only scaling and CLAHE processing.
     test_datagen = ImageDataGenerator(
-        preprocessing_function=apply_clahe_and_preprocess
+        preprocessing_function=apply_clahe
     )
 
     # --- Initialize Flow Streams ---

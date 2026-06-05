@@ -1,7 +1,8 @@
+from datetime import timedelta
 import sys
 import subprocess
 import time
-
+from datetime import datetime
 # =====================================================================
 # END-TO-END PIPELINE ORCHESTRATOR
 # =====================================================================
@@ -18,6 +19,7 @@ def run_phase(script_name, phase_description):
     """
     print(f"\n{'='*70}")
     print(f"[PIPELINE STAGE] {phase_description}")
+    print(f"{datetime.now().isoformat(sep=' ', timespec='milliseconds')}")
     print(f"[SYSTEM] Executing: {script_name}")
     print(f"{'='*70}\n")
     

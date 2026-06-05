@@ -55,7 +55,7 @@ def main(image_path):
     # prediction returns an array like [[0.85]], so we grab the exact number
     prediction_score = model.predict(img_array, verbose=0)[0][0]
 
-    if prediction_score > 0.5:
+    if prediction_score > 0.30:
         diagnosis = "FRACTURE DETECTED"
         confidence = prediction_score * 100
     else:
@@ -70,8 +70,8 @@ def main(image_path):
 
     # 4. Generate the Explainable AI visual
     print("Generating XAI Heatmap...")
-    heatmap = make_gradcam_heatmap(img_array, model)
-    overlaid_img = display_gradcam(img_array, heatmap)
+    heatmap = make_gradcam_heatmap(img_array, model, 'relu')
+    overlaid_img = display_gradcam(img_array, heatmap, prediction_score)
 
     # 5. Display the final result
     plt.figure(figsize=(6, 6))

@@ -12,14 +12,16 @@ from data_loader import get_data_generators
 BASE_DIR = '../'
 RUNS_DIR = os.path.join(BASE_DIR, 'runs')
 
+# SEMINAR DEFENSE: We define multiple clinical thresholds to prove 
+# how the AI can be tuned for different hospital environments.
+CLINICAL_THRESHOLDS = [0.3, 0.5, 0.7]
+
 def get_latest_run_dir():
-    """Finds the most recently created run folder based on actual computer time."""
+    """Finds the most recently created run folder containing a saved model."""
     if not os.path.exists(RUNS_DIR):
         raise FileNotFoundError("The 'runs' directory does not exist.")
     
     all_runs = [os.path.join(RUNS_DIR, d) for d in os.listdir(RUNS_DIR) if os.path.isdir(os.path.join(RUNS_DIR, d))]
-    
-    # NEW FIX: Only consider folders that actually contain a .keras model file!
     valid_runs = [r for r in all_runs if any(f.endswith('.keras') for f in os.listdir(r))]
     
     if not valid_runs:
@@ -28,8 +30,8 @@ def get_latest_run_dir():
     latest_run = max(valid_runs, key=os.path.getmtime)
     return latest_run
 
-def plot_confusion_matrix(y_true, y_pred, run_dir):
-    """Generates and saves a clean, presentation-ready confusion matrix."""
+def plot_confusion_matrix(y_true, y_pred, run_dir, threshold):
+    """Generates and saves a threshold-specific presentation matrix."""
     cm = confusion_matrix(y_true, y_pred)
     
     plt.figure(figsize=(6, 5))
@@ -37,54 +39,67 @@ def plot_confusion_matrix(y_true, y_pred, run_dir):
                 xticklabels=['Normal (0)', 'Fracture (1)'], 
                 yticklabels=['Normal (0)', 'Fracture (1)'])
     
-    plt.title('Confusion Matrix: Hand Fracture Detection')
+    # Dynamically update the title to show the current threshold
+    plt.title(f'Hand Fracture Detection (Threshold: {threshold})')
     plt.ylabel('Actual Diagnosis')
     plt.xlabel('Predicted Diagnosis')
     
-    # Save it to the exact same folder as the model that generated it
+    # Save the matrix with the threshold in the filename so it doesn't overwrite
+    filename = f'confusion_matrix_t{threshold}.png'
     plt.tight_layout()
-    plt.savefig(os.path.join(run_dir, 'confusion_matrix.png'))
+    plt.savefig(os.path.join(run_dir, filename))
     plt.close()
-    print("Confusion Matrix saved.")
+    print(f"-> Saved: {filename}")
 
 def main():
     # 1. Find the latest model folder
     latest_run_dir = get_latest_run_dir()
     
-    # Check if we are evaluating a fine-tuned model or a base model
     if 'finetune' in latest_run_dir:
         model_path = os.path.join(latest_run_dir, 'best_finetuned_model.keras')
     else:
         model_path = os.path.join(latest_run_dir, 'best_model.keras')
         
-    print(f"Loading best model from: {model_path}")
-    
+    print(f"\n[SYSTEM] Loading best model from: {model_path}")
     model = load_model(model_path)
 
     # 2. Load ONLY the Testing Data
-    print("Loading test dataset...")
+    print("[DATA] Loading test dataset...")
     _, _, test_gen = get_data_generators(base_dir=BASE_DIR, batch_size=32)
 
-    # 3. Generate Predictions
-    print("Evaluating model against the test set...")
-    predictions = model.predict(test_gen, verbose=1)
-    
-    # Lowering the threshold to 0.3 for clinical safety (Strategy 2)
-    y_pred = (predictions > 0.3).astype(int).flatten()
+    # 3. Generate Raw Probabilities ONCE
+    # Predicting takes time. We only want to run the images through the GPU once.
+    print("\n[EXECUTION] Extracting raw probability scores from the test set...")
+    raw_predictions = model.predict(test_gen, verbose=1).flatten()
     y_true = test_gen.classes
 
-    # 4. Generate the Classification Report
-    print("\n--- Evaluation Metrics ---")
-    report = classification_report(y_true, y_pred, target_names=['Normal (0)', 'Fracture (1)'])
-    print(report)
+    # 4. Loop through the Clinical Thresholds
+    print(f"\n{'='*50}")
+    print("[ANALYSIS] Commencing Multi-Threshold Evaluation")
+    print(f"{'='*50}")
+    
+    for threshold in CLINICAL_THRESHOLDS:
+        print(f"\n--- Evaluating Threshold: {threshold} ---")
+        
+        # Apply the mathematical cutoff
+        y_pred = (raw_predictions >= threshold).astype(int)
+        
+        # Generate the Classification Report
+        report = classification_report(y_true, y_pred, target_names=['Normal (0)', 'Fracture (1)'])
+        print(report)
 
-    with open(os.path.join(latest_run_dir, 'evaluation_metrics.txt'), 'w') as f:
-        f.write("Classification Report\n=====================\n")
-        f.write(report)
-        print("Metrics report saved.")
+        # Save the Metrics Report
+        report_filename = f'evaluation_metrics_t{threshold}.txt'
+        with open(os.path.join(latest_run_dir, report_filename), 'w') as f:
+            f.write(f"Classification Report (Threshold: {threshold})\n")
+            f.write("========================================\n")
+            f.write(report)
+        print(f"-> Saved: {report_filename}")
 
-    # 5. Generate and Save the Confusion Matrix
-    plot_confusion_matrix(y_true, y_pred, latest_run_dir)
+        # Generate and Save the Confusion Matrix
+        plot_confusion_matrix(y_true, y_pred, latest_run_dir, threshold)
+
+    print(f"\n[SUCCESS] All evaluations complete. Artifacts saved to {latest_run_dir}")
 
 if __name__ == "__main__":
     main()
