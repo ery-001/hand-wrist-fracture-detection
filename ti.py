@@ -1,5 +1,9 @@
-import time
-from datetime import datetime
+import os
 
-timee=datetime.now().isoformat(sep=' ', timespec='milliseconds')
-print(timee)
+# os.system("shutdown /s /t 10")
+
+
+text = "hello"
+num = "12345"
+
+print(text[1] + num[3])

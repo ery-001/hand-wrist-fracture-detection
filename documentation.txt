@@ -1,0 +1,164 @@
+Project: MURA Hand & Wrist Fracture Detection
+============================================
+
+Overview
+--------
+This repository implements a transfer-learning pipeline to detect hand and wrist
+abnormalities (fractures) using the MURA v1.1 dataset. It uses a DenseNet121
+backbone with custom preprocessing (CLAHE), a lightweight classification head,
+and a two-stage training workflow: initial training with a frozen backbone
+followed by deep fine-tuning.
+
+Key features
+- Filters MURA to `XR_HAND` and `XR_WRIST` study types only.
+- CLAHE preprocessing to enhance bone contrast before DenseNet normalization.
+- Two-stage training: base training (frozen backbone) → fine-tune (unfreeze top layers).
+- Class-weighting to mitigate label imbalance and multiple evaluation thresholds
+  (0.3, 0.5, 0.7) for clinical trade-offs.
+- Timestamped `runs/` folders that store models, logs, and evaluation artifacts.
+
+Repository layout (summary)
+--------------------------
+- `src/` : Core pipeline scripts and modules.
+  - `data_loader.py` : CSV parsing, CLAHE preprocessing, and Keras generators.
+  - `model.py` : Builds DenseNet121-based model (attention block + head).
+  - `train.py` : Base training script (creates `runs/run_<timestamp>/`).
+  - `fine_tune.py` : Fine-tuning script (creates `runs/finetune_<timestamp>/`).
+  - `evaluate.py` : Multi-threshold evaluation and confusion matrix generation.
+  - `predict.py` : Single-image prediction + Grad-CAM visualization.
+  - `grad_cam.py` : Grad-CAM utility (used by `predict.py`).
+  - `requirements.txt` : Python dependency pins for development (inside `src`).
+- `MURA-v1.1/` : (Not included) Expected dataset folder containing `train/`, `valid/`,
+  and CSV lists `train_image_paths.csv` / `valid_image_paths.csv`.
+- `runs/` : Generated at runtime. Contains timestamped experiment outputs.
+- `orchestration/` : `run_pipeline.py` launches `train.py` → `fine_tune.py` → `evaluate.py`.
+- `web_app/` : (placeholder) web application entry (`app.py` currently empty).
+- `README.md`, `requirements.txt`, `documentation.txt` : docs and top-level deps.
+
+Dataset and expected layout
+---------------------------
+Download MURA v1.1 from Stanford and place it at repository root with this
+structure:
+
+latest-project-trial/
+└── MURA-v1.1/
+    ├── train/
+    ├── valid/
+    ├── train_image_paths.csv
+    └── valid_image_paths.csv
+
+CSV file paths are expected to be relative to the repo root. `data_loader.py`
+filters the CSV rows for entries containing `XR_HAND` or `XR_WRIST` and infers
+binary labels from the path containing `positive` (1) or not (0).
+
+Environment & dependencies
+--------------------------
+- Python 3.10+ recommended (3.11 tested)
+- Core libs: TensorFlow 2.x, OpenCV (`cv2`), pandas, scikit-learn, matplotlib,
+  seaborn, numpy
+- Create and activate a venv then install:
+
+  python -m venv .venv
+  # Windows
+  .venv\Scripts\activate
+  pip install -r requirements.txt
+
+Running the pipeline (typical workflow)
+--------------------------------------
+Work from the `src/` directory with the venv active.
+
+1) Base training
+
+   cd src
+   python train.py
+
+   - Creates `runs/run_<timestamp>/` containing:
+     - `best_model.keras` (best validation accuracy)
+     - `training_log.csv`
+     - `training_history.png`
+
+2) Fine-tune (uses latest base run)
+
+   cd src
+   python fine_tune.py
+
+   - Creates `runs/finetune_<timestamp>/` containing:
+     - `best_finetuned_model.keras`
+     - `finetuning_log.csv`
+
+3) Evaluate (multi-threshold)
+
+   cd src
+   python evaluate.py
+
+   - Loads the most recent run folder with a `.keras` model and writes
+     `evaluation_metrics_t<threshold>.txt` and confusion matrix PNGs.
+
+4) Predict (single image with Grad-CAM)
+
+   cd src
+   python predict.py <path/to/image.png>
+
+   - Loads the latest model and shows a visual Grad-CAM overlay.
+
+Automation
+----------
+Use the orchestrator to run the full flow sequentially from `orchestration/`:
+
+  python orchestration/run_pipeline.py
+
+It will execute the scripts in order; the script expects relative paths (it
+calls `../src/train.py`, etc.).
+
+Design notes & important implementation details
+----------------------------------------------
+- Preprocessing: `data_loader.apply_clahe()` applies CLAHE on a grayscale
+  conversion of the image and then converts back to RGB. The final tensor
+  is normalized with DenseNet's `preprocess_input`.
+- Model: `model.build_model()` creates a DenseNet121 backbone (ImageNet weights),
+  a small attention spotlight (1x1 conv with sigmoid) multiplied into features,
+  followed by GlobalAveragePooling -> Dropout(0.5) -> Dense(1, sigmoid).
+- Training strategy: base training freezes the backbone and trains the head.
+  Fine-tuning unfreezes top layers (scripts differ: `train.py` comments say
+  top 50 while `fine_tune.py` unfreezes top 150 layers — review before running
+  if you need exact behavior).
+- Evaluation: runs predictions once per test set and applies thresholds
+  specified in `evaluate.py` (0.3, 0.5, 0.7 by default).
+
+Configuration
+-------------
+- Most scripts define `BASE_DIR = '../'` so they can be run from `src/` while
+  accessing files in the repo root. If you change your working directory,
+  update `BASE_DIR` accordingly.
+- Edit hyperparameters at the top of `train.py` and `fine_tune.py` (epochs,
+  batch size, learning rates) before launching big runs.
+
+Outputs and artefacts
+---------------------
+- Models, logs, metrics and diagnostic charts are stored under `runs/` with
+  timestamped directories. Keep older runs for reproducibility and analysis.
+
+Known placeholders and gaps
+---------------------------
+- `src/config.py` and `web_app/app.py` are present but empty — configuration
+  centralization and a web UI are planned but not implemented.
+
+Troubleshooting
+---------------
+- FileNotFoundError for CSVs: ensure `MURA-v1.1` is at the project root and
+  CSV files exist.
+- No `.keras` found in `runs/`: run training first; model artifacts are created
+  by the `ModelCheckpoint` callback during successful training.
+- OOM errors: lower `BATCH_SIZE` in `train.py` or switch to a GPU-enabled TF
+  build.
+
+Legal & citation
+----------------
+- MURA dataset terms: follow Stanford MURA competition terms and citation.
+- DenseNet: Huang et al., *Densely Connected Convolutional Networks*.
+
+Contact & next steps
+--------------------
+- This document was generated from repository sources. If you want a
+  README-style polished markdown or a Sphinx/RTD site, tell me and I can
+  convert this file into `README.md` or scaffold docs.

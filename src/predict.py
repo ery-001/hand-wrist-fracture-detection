@@ -39,6 +39,7 @@ def load_and_preprocess_image(img_path):
 def main(image_path):
     # 1. Find and load the fully trained model
     latest_run_dir = get_latest_run_dir()
+    print(f"Latest run directory: {latest_run_dir}")
     if 'finetune' in latest_run_dir:
         model_path = os.path.join(latest_run_dir, 'best_finetuned_model.keras')
     else:
@@ -53,19 +54,27 @@ def main(image_path):
 
     # 3. Make the Clinical Prediction
     # prediction returns an array like [[0.85]], so we grab the exact number
+   # Ensure this variable matches the threshold we optimized in evaluate.py
+    CLINICAL_THRESHOLD = 0.5
+
     prediction_score = model.predict(img_array, verbose=0)[0][0]
 
-    if prediction_score > 0.30:
+    if prediction_score >= CLINICAL_THRESHOLD:
         diagnosis = "FRACTURE DETECTED"
-        confidence = prediction_score * 100
+        # We display the exact mathematical probability
+        readout = f"Fracture Probability: {prediction_score * 100:.1f}%"
     else:
-        diagnosis = "NORMAL (NO FRACTURE)"
-        confidence = (1 - prediction_score) * 100
+        diagnosis = "NORMAL (CLEARED)"
+        # The probability that the bone is completely healthy
+        readout = f"Normal Probability: {(1 - prediction_score) * 100:.1f}%"
+
+    print(f"Diagnosis: {diagnosis}")
+    print(f"Metrics: {readout} (ER Threshold: {CLINICAL_THRESHOLD * 100}%)")
 
     # Print a clean clinical report to the terminal
     print("\n" + "="*40)
     print(f" CLINICAL DIAGNOSIS : {diagnosis}")
-    print(f" AI CONFIDENCE      : {confidence:.2f}%")
+    print(f" AI CONFIDENCE      : {readout}%")
     print("="*40 + "\n")
 
     # 4. Generate the Explainable AI visual
@@ -76,7 +85,7 @@ def main(image_path):
     # 5. Display the final result
     plt.figure(figsize=(6, 6))
     plt.imshow(overlaid_img)
-    plt.title(f"{diagnosis}\nConfidence: {confidence:.2f}%")
+    plt.title(f"{diagnosis}\nConfidence: {readout}%")
     plt.axis('off')
     plt.tight_layout()
     plt.show()

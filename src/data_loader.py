@@ -89,6 +89,12 @@ def get_data_generators(base_dir='.', batch_size=32, target_size=(224, 224)):
         rotation_range=15,          # Mild rotation to simulate imperfect patient positioning
         horizontal_flip=True,       # Left/Right hand variations
         zoom_range=0.2,             # Simulate different camera distances
+        # --- V3 FIX: RESTRAINED GEOMETRIC JITTER ---
+        width_shift_range=0.05,     # 5% shift to break center-bias without pushing fractures off-canvas
+        height_shift_range=0.05,    
+        fill_mode='constant',       # Fills newly created empty space with a solid color
+        cval=0,                     # Sets that solid color to pure black
+        # -------------------------------------------
         preprocessing_function=apply_clahe, # Our custom logic
         validation_split=0.176      # Extracts ~15% of total data for validation
     )

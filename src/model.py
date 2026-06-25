@@ -4,6 +4,9 @@ from tensorflow.keras.layers import GlobalAveragePooling2D, Dropout, Dense
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
+# --- V3 FIX: IMPORT FOCAL LOSS ---
+from tensorflow.keras.losses import BinaryFocalCrossentropy
+
 import ssl
 import os
 
@@ -12,32 +15,42 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 def build_model(input_shape=(224, 224, 3), learning_rate=0.001):
     """
-    Constructs the transfer learning model using a pre-trained DenseNet121 backbone,
-    appended with a custom classification head for binary fracture detection.
+    Constructs the transfer learning model with a Custom Spatial Attention Block
+    and Focal Loss to prevent Majority Class Collapse.
     """
-    # 1. Load the pre-trained DenseNet121 backbone
-    # include_top=False removes the original 1000-class ImageNet classification layer
     base_model = DenseNet121(
         weights='imagenet', 
         include_top=False, 
         input_shape=input_shape
     )
     
-    # Freeze the base model to retain the pre-learned ImageNet features
     base_model.trainable = False
     
-    # 2. Build the Custom Classification Head
+    # ---------------------------------------------------------
+    # THE SEMINAR FLEX: SPATIAL ATTENTION BLOCK
+    # ---------------------------------------------------------
+    # The output of DenseNet is a 7x7 grid of features. 
     x = base_model.output
-    x = GlobalAveragePooling2D()(x)
-    x = Dropout(0.5)(x) # 50% dropout to prevent overfitting
-    predictions = Dense(1, activation='sigmoid')(x) # Binary output (0 or 1)
     
-    # 3. Assemble the final model
+    # 1. We create a 1x1 Convolution that looks at the grid and generates a "heatmap" of importance (0 to 1)
+    attention_weights = tf.keras.layers.Conv2D(1, (1, 1), activation='sigmoid', name='attention_spotlight')(x)
+    
+    # 2. We multiply the original features by these attention weights. 
+    # Healthy areas get multiplied by ~0 (ignored). Fractures get multiplied by ~1 (amplified).
+    x = tf.keras.layers.Multiply()([x, attention_weights])
+    # ---------------------------------------------------------
+    
+    # Proceed to the standard classification head
+    x = GlobalAveragePooling2D()(x)
+    x = Dropout(0.5)(x) 
+    predictions = Dense(1, activation='sigmoid')(x) 
+    
     model = Model(inputs=base_model.input, outputs=predictions)
     
-    # 4. Compile the model
+    # --- REVERTING TO STABLE CROSS-ENTROPY ---
     model.compile(
         optimizer=Adam(learning_rate=learning_rate),
+        # We drop the Focal Loss and return to standard binary_crossentropy
         loss='binary_crossentropy',
         metrics=[
             'accuracy', 
