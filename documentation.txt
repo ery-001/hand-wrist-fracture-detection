@@ -157,6 +157,19 @@ Legal & citation
 - MURA dataset terms: follow Stanford MURA competition terms and citation.
 - DenseNet: Huang et al., *Densely Connected Convolutional Networks*.
 
+Example evaluation result (threshold 0.5)
+----------------------------------------
+Classification Report (Threshold: 0.5)
+========================================
+              precision    recall  f1-score   support
+
+  Normal (0)       0.70      0.75      0.72       271
+Fracture (1)       0.60      0.53      0.56       189
+
+    accuracy                           0.66       460
+   macro avg       0.65      0.64      0.64       460
+weighted avg       0.66      0.66      0.66       460
+
 Contact & next steps
 --------------------
 - This document was generated from repository sources. If you want a
